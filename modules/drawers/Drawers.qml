@@ -12,12 +12,12 @@ Variants {
 
         required property ShellScreen modelData
 
-        TopExclusions {
+        Exclusions {
             screen: scope.modelData
             bar: content.bar
         }
 
-        TopContentWindow {
+        ContentWindow {
             id: content
 
             screen: scope.modelData
