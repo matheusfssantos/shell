@@ -107,6 +107,17 @@ Scope {
             screenState.utilities = !screenState.utilities;
         }
     }
+    CustomShortcut {
+        name: "shortcuts"
+        description: "Open keyboard shortcuts"
+    
+        onPressed: {
+            const idx = PageRegistry.pages.findIndex(p => p.icon === "keyboard");
+            WindowFactory.create(undefined, {
+                initialPageIdx: idx >= 0 ? idx : 0
+            });
+        }
+    }
 
     IpcHandler {
         function toggle(drawer: string): void {

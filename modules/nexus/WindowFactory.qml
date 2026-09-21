@@ -25,6 +25,7 @@ Singleton {
         FloatingWindow {
             id: win
 
+			property int initialPageIdx: 0
             color: Colours.tPalette.m3surface
             surfaceFormat.opaque: false
 
@@ -47,6 +48,7 @@ Singleton {
             Nexus {
                 id: nexus
 
+				nState.currentPageIdx: win.initialPageIdx
                 anchors.fill: parent
                 nState.screen: win.screen
                 nState.isWindow: true

@@ -175,6 +175,13 @@ QtObject {
             }
         },
         Component {
+            StackPage {
+                Component {
+                    KeyboardShortcutsPage {}
+                }
+            }
+        },
+        Component {
             // Language & region
             StackPage {
                 Component {

@@ -83,6 +83,12 @@ QtObject {
             category: "shell"
         },
         {
+            label: Tr.tr("Keyboard shortcuts"),
+            icon: "keyboard",
+            description: Tr.tr("Search and view keyboard shortcuts"),
+            category: "shell"
+        },
+        {
             label: Tr.tr("Language & region"),
             icon: "globe",
             description: Tr.tr("UI language, weather location, display units"),
