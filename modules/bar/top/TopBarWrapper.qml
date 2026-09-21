@@ -1,0 +1,108 @@
+pragma ComponentBehavior: Bound
+
+import QtQuick
+import Quickshell
+import Caelestia.Config
+import qs.components
+import qs.utils
+import qs.modules.bar.popouts as BarPopouts
+
+Item {
+    id: root
+
+    required property ShellScreen screen
+    required property ScreenState screenState
+    required property BarPopouts.Wrapper popouts
+    required property bool fullscreen
+
+    readonly property bool disabled:
+        Strings.testRegexList(Config.bar.excludedScreens, screen.name)
+
+    readonly property int clampedHeight:
+        Math.max(Config.border.minThickness, implicitHeight)
+
+    readonly property int padding:
+        Math.max(Tokens.padding.small, Config.border.thickness)
+
+    readonly property int contentHeight:
+        Tokens.sizes.bar.innerWidth + padding * 2
+
+    readonly property int exclusiveZone:
+        !disabled && (Config.bar.persistent || screenState.bar)
+            ? contentHeight
+            : Config.border.thickness
+
+    readonly property bool shouldBeVisible:
+        !fullscreen
+        && !disabled
+        && (Config.bar.persistent || screenState.bar || isHovered)
+
+    property bool isHovered
+
+    function closeTray(): void {
+        (content.item as TopBar)?.closeTray();
+    }
+
+    function checkPopout(x: real): void {
+        (content.item as TopBar)?.checkPopout(x);
+    }
+
+    function handleWheel(x: real, angleDelta: point): void {
+        (content.item as TopBar)?.handleWheel(x, angleDelta);
+    }
+
+    clip: true
+
+    visible: height > Config.border.thickness
+    implicitHeight: fullscreen ? 0 : Config.border.thickness
+
+    states: State {
+        name: "visible"
+        when: root.shouldBeVisible
+
+        PropertyChanges {
+            root.implicitHeight: root.contentHeight
+        }
+    }
+
+    transitions: [
+        Transition {
+            from: ""
+            to: "visible"
+
+            Anim {
+                target: root
+                property: "implicitHeight"
+            }
+        },
+
+        Transition {
+            from: "visible"
+            to: ""
+
+            Anim {
+                target: root
+                property: "implicitHeight"
+                type: Anim.Emphasized
+            }
+        }
+    ]
+
+    Loader {
+        id: content
+
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+
+        active: root.shouldBeVisible
+
+        sourceComponent: TopBar {
+            height: root.contentHeight
+
+            screen: root.screen
+            screenState: root.screenState
+            fullscreen: root.fullscreen
+        }
+    }
+}

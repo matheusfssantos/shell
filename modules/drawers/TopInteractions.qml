@@ -14,7 +14,7 @@ CustomMouseArea {
     required property BarPopouts.Wrapper popouts
     required property ScreenState screenState
     required property Panels panels
-    required property Bar.BarWrapper bar
+    required property var bar
     required property real borderThickness
     required property bool fullscreen
 

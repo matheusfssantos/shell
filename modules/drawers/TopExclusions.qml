@@ -10,7 +10,7 @@ Scope {
     id: root
 
     required property ShellScreen screen
-    required property Bar.BarWrapper bar
+    required property var bar
 
     ExclusionZone {
         anchors.left: true

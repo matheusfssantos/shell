@@ -88,8 +88,16 @@ ConnectedRect {
                         return triggerArea;
 
                     const win = QsWindow.window;
-                    const contentWin = win as ContentWindow; // If inside the drawer content window, put it inside the interaction wrapper so hover works
-                    return contentWin ? contentWin.interactionWrapper : (win as QsWindow).contentItem;
+                    const contentWin = win as ContentWindow;
+                    const topContentWin = win as TopContentWindow;
+                    
+                    if (contentWin)
+                        return contentWin.interactionWrapper;
+                    
+                    if (topContentWin)
+                        return topContentWin.interactionWrapper;
+                    
+                    return (win as QsWindow).contentItem;
                 }
                 anchors.fill: parent
                 enabled: popup.open

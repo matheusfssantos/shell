@@ -32,11 +32,11 @@ Item {
     
             if (angleDelta.y > 0)
                 monitor.setBrightness(
-                    monitor.brightness + GlobalConfig.services.brightnessIncrement
+                    monitor.brightness + Config.services.brightnessIncrement
                 );
             else if (angleDelta.y < 0)
                 monitor.setBrightness(
-                    monitor.brightness - GlobalConfig.services.brightnessIncrement
+                    monitor.brightness - Config.services.brightnessIncrement
                 );
         }
     }

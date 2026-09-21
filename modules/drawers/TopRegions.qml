@@ -8,7 +8,7 @@ import qs.modules.bar as Bar
 Region {
     id: root
 
-    required property Bar.BarWrapper bar
+    required property var bar
     required property Panels panels
     required property var win
 
