@@ -15,6 +15,32 @@ Item {
 
     readonly property int hPadding: Tokens.padding.large
 
+    function closeTray(): void {
+    }
+    
+    function checkPopout(x: real): void {
+    }
+    
+    function handleWheel(x: real, angleDelta: point): void {
+        if (x < root.screen.width / 2 && Config.bar.scrollActions.volume) {
+            if (angleDelta.y > 0)
+                Audio.incrementVolume();
+            else if (angleDelta.y < 0)
+                Audio.decrementVolume();
+        } else if (Config.bar.scrollActions.brightness) {
+            const monitor = Brightness.getMonitorForScreen(root.screen);
+    
+            if (angleDelta.y > 0)
+                monitor.setBrightness(
+                    monitor.brightness + GlobalConfig.services.brightnessIncrement
+                );
+            else if (angleDelta.y < 0)
+                monitor.setBrightness(
+                    monitor.brightness - GlobalConfig.services.brightnessIncrement
+                );
+        }
+    }
+
     RowLayout {
         anchors.fill: parent
         anchors.leftMargin: root.hPadding
