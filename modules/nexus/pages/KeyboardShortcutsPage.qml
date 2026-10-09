@@ -14,7 +14,7 @@ PageBase {
     property string query: ""
 
     readonly property var shortcuts: [
-      	{ category: "Windows", keys: "Super + Alt + F", action: "Fullscreen" },
+        { category: "Windows", keys: "Super + Alt + F", action: "Fullscreen" },
         { category: "Windows", keys: "Super + F", action: "Maximize" },
         { category: "Windows", keys: "Super + Q", action: "Close window" },
         { category: "Windows", keys: "Super + P", action: "Pin window" },

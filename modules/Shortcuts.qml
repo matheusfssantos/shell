@@ -110,7 +110,7 @@ Scope {
     CustomShortcut {
         name: "shortcuts"
         description: "Open keyboard shortcuts"
-    
+
         onPressed: {
             const idx = PageRegistry.pages.findIndex(p => p.icon === "keyboard");
             WindowFactory.create(undefined, {
