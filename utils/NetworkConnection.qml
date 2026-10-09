@@ -54,8 +54,8 @@ QtObject {
 
     /**
      * Connect to a wireless network.
-     * Handles both secured and open networks, checks for saved profiles,
-     * and shows password dialog if needed.
+     * Handles both secured and open networks, tries saved credentials,
+     * and shows the password dialog if needed.
      *
      * @param network The network object to connect to (must have ssid, isSecure, bssid properties)
      * @param session Optional Session object (for controlcenter - must have network property with showPasswordDialog and pendingNetwork)
@@ -67,32 +67,23 @@ QtObject {
         }
 
         if (network.isSecure) {
-            const hasSavedProfile = Nmcli.hasSavedProfile(network.ssid);
-
-            if (hasSavedProfile) {
-                Nmcli.connectToNetwork(network.ssid, "", network.bssid, null);
-            } else {
-                // Use password check with callback
-                Nmcli.connectToNetworkWithPasswordCheck(network.ssid, network.isSecure, result => {
-                    if (result.needsPassword) {
-                        // Clear pending connection if exists
-                        if (Nmcli.pendingConnection) {
-                            Nmcli.connectionCheckTimer.stop();
-                            Nmcli.immediateCheckTimer.stop();
-                            Nmcli.immediateCheckTimer.checkCount = 0;
-                            Nmcli.pendingConnection = null;
-                        }
-
-                        // Handle password dialog - use session if available, otherwise use callback
-                        if (session && session.network) {
-                            session.network.showPasswordDialog = true;
-                            session.network.pendingNetwork = network;
-                        } else if (onPasswordNeeded) {
-                            onPasswordNeeded(network);
-                        }
+            Nmcli.connectToNetworkWithPasswordCheck(network.ssid, true, result => {
+                if (result.needsPassword) {
+                    if (Nmcli.pendingConnection) {
+                        Nmcli.connectionCheckTimer.stop();
+                        Nmcli.immediateCheckTimer.stop();
+                        Nmcli.immediateCheckTimer.checkCount = 0;
+                        Nmcli.pendingConnection = null;
                     }
-                }, network.bssid);
-            }
+
+                    if (session && session.network) {
+                        session.network.showPasswordDialog = true;
+                        session.network.pendingNetwork = network;
+                    } else if (onPasswordNeeded) {
+                        onPasswordNeeded(network);
+                    }
+                }
+            }, network.bssid);
         } else {
             Nmcli.connectToNetwork(network.ssid, "", network.bssid, null);
         }
