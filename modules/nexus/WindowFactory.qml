@@ -12,7 +12,11 @@ Singleton {
     id: root
 
     function create(parent: Item, props: var): void {
-        nexusComp.createObject(parent ?? dummy, props);
+        const activeScreen = ShellState.forActive()?.modelData;
+        const initialProps = Object.assign({}, activeScreen ? {
+            screen: activeScreen
+        } : {}, props ?? {});
+        nexusComp.createObject(parent ?? dummy, initialProps);
     }
 
     QtObject {
@@ -25,7 +29,7 @@ Singleton {
         FloatingWindow {
             id: win
 
-			property int initialPageIdx: 0
+            property int initialPageIdx: 0
             color: Colours.tPalette.m3surface
             surfaceFormat.opaque: false
 
@@ -37,8 +41,8 @@ Singleton {
             implicitWidth: nexus.implicitWidth
             implicitHeight: nexus.implicitHeight
 
-            minimumSize.width: contentItem.Tokens.sizes.nexus.minWidth
-            minimumSize.height: contentItem.Tokens.sizes.nexus.minHeight
+            minimumSize.width: Math.min(contentItem.Tokens.sizes.nexus.minWidth, nexus.availableScreenWidth)
+            minimumSize.height: Math.min(contentItem.Tokens.sizes.nexus.minHeight, nexus.availableScreenHeight)
 
             contentItem.Config.screen: screen.name
             contentItem.Tokens.screen: screen.name
@@ -48,7 +52,7 @@ Singleton {
             Nexus {
                 id: nexus
 
-				nState.currentPageIdx: win.initialPageIdx
+                nState.currentPageIdx: win.initialPageIdx
                 anchors.fill: parent
                 nState.screen: win.screen
                 nState.isWindow: true

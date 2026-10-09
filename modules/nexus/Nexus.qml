@@ -18,10 +18,23 @@ Item {
     }
     property color blobColour: Colours.tPalette.m3surfaceContainerLow
 
+    readonly property real screenMargin: Tokens.padding.extraLarge * 2
+    readonly property real availableScreenWidth: Math.max(1, (nState.screen?.width ?? Tokens.sizes.nexus.minWidth) - screenMargin * 2)
+    readonly property real availableScreenHeight: Math.max(1, (nState.screen?.height ?? Tokens.sizes.nexus.minHeight) - screenMargin * 2)
+
     signal close
 
-    implicitWidth: Math.round(implicitHeight * Tokens.sizes.nexus.ratio)
-    implicitHeight: Math.round(nState.screen.height * Tokens.sizes.nexus.heightMult)
+    implicitWidth: {
+        const target = Math.round(implicitHeight * Tokens.sizes.nexus.ratio);
+        const minimum = Math.min(Tokens.sizes.nexus.minWidth, availableScreenWidth);
+        return Math.max(minimum, Math.min(target, availableScreenWidth));
+    }
+    implicitHeight: {
+        const screenHeight = nState.screen?.height ?? Tokens.sizes.nexus.minHeight;
+        const target = Math.round(screenHeight * Tokens.sizes.nexus.heightMult);
+        const minimum = Math.min(Tokens.sizes.nexus.minHeight, availableScreenHeight);
+        return Math.max(minimum, Math.min(target, availableScreenHeight));
+    }
 
     Behavior on blobColour {
         CAnim {}
