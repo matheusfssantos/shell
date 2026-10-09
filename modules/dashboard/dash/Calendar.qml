@@ -9,6 +9,7 @@ import qs.components
 import qs.components.controls
 import qs.components.effects
 import qs.services
+import qs.modules.calendar
 
 CustomMouseArea {
     id: root
@@ -154,6 +155,15 @@ CustomMouseArea {
                 padding: Tokens.padding.small
                 onClicked: root.screenState.dashboardDate = new Date(root.nonAnimCurrYear, root.nonAnimCurrMonth + 1, 1)
             }
+
+            IconButton {
+                isRound: true
+                icon: "open_in_new"
+                type: IconButton.Text
+                font: Tokens.font.icon.builders.small.weight(Font.Bold).build()
+                padding: Tokens.padding.small
+                onClicked: CalendarWindowFactory.open(root.screenState.dashboardDate, ShellState.forActive()?.modelData)
+            }
         }
 
         DayOfWeekRow {
@@ -197,8 +207,22 @@ CustomMouseArea {
 
                     required property var model
 
+                    readonly property var events: {
+                        CalendarEvents.events;
+                        return CalendarEvents.eventsForDate(model.date);
+                    }
+                    readonly property bool selected: CalendarEvents.dateKey(model.date) === CalendarEvents.dateKey(root.screenState.dashboardDate)
+
                     implicitWidth: implicitHeight
                     implicitHeight: text.implicitHeight + Tokens.padding.small
+
+                    Rectangle {
+                        anchors.centerIn: parent
+                        width: Math.max(text.implicitWidth, text.implicitHeight) + Tokens.padding.extraSmall * 2
+                        height: width
+                        radius: width / 2
+                        color: dayItem.selected && !dayItem.model.today ? Colours.palette.m3primaryContainer : "transparent"
+                    }
 
                     StyledText {
                         id: text
@@ -208,6 +232,8 @@ CustomMouseArea {
                         horizontalAlignment: Text.AlignHCenter
                         text: grid.locale.toString(dayItem.model.day)
                         color: {
+                            if (dayItem.selected && !dayItem.model.today)
+                                return Colours.palette.m3onPrimaryContainer;
                             const dayOfWeek = dayItem.model.date.getDay();
                             if (dayOfWeek === 0 || dayOfWeek === 6)
                                 return Colours.palette.m3tertiary;
@@ -216,6 +242,32 @@ CustomMouseArea {
                         }
                         opacity: dayItem.model.today || dayItem.model.month === grid.month ? 1 : 0.4
                         font: Tokens.font.body.small
+                    }
+
+                    Row {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.bottom: parent.bottom
+                        anchors.bottomMargin: 1
+                        spacing: 2
+                        visible: dayItem.events.length > 0
+
+                        Repeater {
+                            model: dayItem.events.slice(0, 3)
+
+                            delegate: Rectangle {
+                                required property var modelData
+
+                                width: 4
+                                height: 4
+                                radius: 2
+                                color: modelData.colour ?? Colours.palette.m3primary
+                            }
+                        }
+                    }
+
+                    TapHandler {
+                        onTapped: root.screenState.dashboardDate = dayItem.model.date
+                        onDoubleTapped: CalendarWindowFactory.open(dayItem.model.date, ShellState.forActive()?.modelData)
                     }
                 }
             }

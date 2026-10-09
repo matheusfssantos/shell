@@ -9,8 +9,6 @@ import qs.modules.nexus.common
 PageBase {
     id: root
 
-    title: Tr.tr("Keyboard shortcuts")
-
     property string query: ""
 
     readonly property var shortcuts: [
@@ -31,6 +29,7 @@ PageBase {
         { category: "Caelestia", keys: "Super + L", action: "Lock session" },
         { category: "Caelestia", keys: "Super + V", action: "Clipboard" },
         { category: "Caelestia", keys: "Super + Period", action: "Emoji picker" },
+        { category: "Caelestia", keys: "Super + F2", action: "Open calendar" },
 
         { category: "Workspaces", keys: "Super + 1..0", action: "Switch workspace" },
         { category: "Workspaces", keys: "Super + Alt + 1..0", action: "Move window to workspace" },
@@ -44,6 +43,8 @@ PageBase {
         { category: "Utilities", keys: "Super + Shift + Alt + S", action: "Screenshot region" },
         { category: "Utilities", keys: "Super + Shift + C", action: "Color picker" }
     ]
+
+    title: Tr.tr("Keyboard shortcuts")
 
     ColumnLayout {
         anchors.horizontalCenter: parent.horizontalCenter
@@ -101,6 +102,7 @@ PageBase {
 
                         StyledText {
                             id: keyText
+
                             anchors.centerIn: parent
                             text: modelData.keys
                             font: Tokens.font.label.large

@@ -4,6 +4,7 @@ import Quickshell.Io
 import Caelestia
 import qs.components.misc
 import qs.services
+import qs.modules.calendar
 import qs.modules.nexus
 
 Scope {
@@ -117,6 +118,11 @@ Scope {
                 initialPageIdx: idx >= 0 ? idx : 0
             });
         }
+    }
+    CustomShortcut {
+        name: "calendar"
+        description: "Open calendar"
+        onPressed: CalendarWindowFactory.open(new Date(), ShellState.forActive()?.modelData)
     }
 
     IpcHandler {
