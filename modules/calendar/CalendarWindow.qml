@@ -16,7 +16,9 @@ FloatingWindow {
     property date selectedDate: new Date()
     property date displayDate: new Date()
     property bool editing
+    property bool showAccounts
     property string editingId: ""
+    property string draftCalendarId: "local"
     property string draftTitle: ""
     property string draftDate: ""
     property string draftStart: "09:00"
@@ -24,6 +26,10 @@ FloatingWindow {
     property string draftLocation: ""
     property string draftNotes: ""
     property bool draftAllDay
+    property string googleCredentialsPath: ""
+    property string googleAccountLabel: ""
+    property string microsoftClientId: ""
+    property string microsoftAccountLabel: ""
 
     readonly property var selectedEvents: {
         CalendarEvents.events;
@@ -31,6 +37,10 @@ FloatingWindow {
     }
     readonly property real availableWidth: Math.max(800, screen.width - 96)
     readonly property real availableHeight: Math.max(560, screen.height - 96)
+    readonly property var writableCalendars: {
+        CalendarEvents.calendars;
+        return CalendarEvents.calendars.filter(calendar => calendar.writable);
+    }
 
     signal closing
 
@@ -66,8 +76,20 @@ FloatingWindow {
         return `${Qt.locale().toString(new Date(event.startMs), "HH:mm")}–${Qt.locale().toString(new Date(event.endMs), "HH:mm")}`;
     }
 
+    function calendarName(calendarId) {
+        return CalendarEvents.calendarById(calendarId).name;
+    }
+
+    function cycleCalendar() {
+        if (writableCalendars.length < 2 || editingId)
+            return;
+        const current = writableCalendars.findIndex(calendar => calendar.id === draftCalendarId);
+        draftCalendarId = writableCalendars[(current + 1) % writableCalendars.length].id;
+    }
+
     function beginCreate() {
         editingId = "";
+        draftCalendarId = CalendarEvents.defaultWritableCalendar().id;
         draftTitle = "";
         draftDate = dateInput(selectedDate);
         draftStart = "09:00";
@@ -75,11 +97,17 @@ FloatingWindow {
         draftLocation = "";
         draftNotes = "";
         draftAllDay = false;
+        showAccounts = false;
         editing = true;
     }
 
     function beginEdit(event) {
+        if (event.writable === false) {
+            Toaster.toast(Tr.tr("Read-only event"), Tr.tr("This calendar does not allow changes."), "lock");
+            return;
+        }
         editingId = event.id;
+        draftCalendarId = event.calendarId ?? "local";
         draftTitle = event.title;
         draftDate = dateInput(new Date(event.startMs));
         draftStart = timeInput(event.startMs);
@@ -87,6 +115,7 @@ FloatingWindow {
         draftLocation = event.location ?? "";
         draftNotes = event.notes ?? "";
         draftAllDay = event.allDay ?? false;
+        showAccounts = false;
         editing = true;
     }
 
@@ -113,6 +142,7 @@ FloatingWindow {
             startMs: start.getTime(),
             endMs: end.getTime(),
             allDay: draftAllDay,
+            calendarId: draftCalendarId,
             location: draftLocation.trim(),
             notes: draftNotes.trim()
         };
@@ -146,6 +176,22 @@ FloatingWindow {
         }
     }
 
+    Connections {
+        function onAuthorizationCompleted(success) {
+            if (success) {
+                root.googleCredentialsPath = "";
+                root.googleAccountLabel = "";
+                root.microsoftClientId = "";
+                root.microsoftAccountLabel = "";
+                Toaster.toast(Tr.tr("Account connected"), Tr.tr("Calendar synchronization has started."), "event_available");
+            } else {
+                Toaster.toast(Tr.tr("Unable to connect account"), CalendarEvents.lastError, "event_busy");
+            }
+        }
+
+        target: CalendarEvents
+    }
+
     StyledRect {
         anchors.fill: parent
         color: Colours.tPalette.m3surface
@@ -176,7 +222,24 @@ FloatingWindow {
                         root.selectedDate = new Date();
                         root.displayDate = new Date();
                         root.editing = false;
+                        root.showAccounts = false;
                     }
+                }
+
+                TextButton {
+                    text: Tr.tr("Accounts")
+                    type: root.showAccounts ? TextButton.Filled : TextButton.Text
+                    onClicked: {
+                        root.showAccounts = !root.showAccounts;
+                        root.editing = false;
+                    }
+                }
+
+                IconButton {
+                    enabled: !CalendarEvents.syncing
+                    icon: CalendarEvents.syncing ? "sync" : "refresh"
+                    type: IconButton.Text
+                    onClicked: CalendarEvents.sync()
                 }
 
                 TextButton {
@@ -344,7 +407,7 @@ FloatingWindow {
                     Loader {
                         anchors.fill: parent
                         anchors.margins: Tokens.padding.large
-                        sourceComponent: root.editing ? editorComponent : agendaComponent
+                        sourceComponent: root.showAccounts ? accountsComponent : (root.editing ? editorComponent : agendaComponent)
                     }
                 }
             }
@@ -422,6 +485,12 @@ FloatingWindow {
                             }
 
                             StyledText {
+                                text: root.calendarName(eventCard.modelData.calendarId)
+                                color: Colours.palette.m3onSurfaceVariant
+                                font: Tokens.font.label.small
+                            }
+
+                            StyledText {
                                 Layout.fillWidth: true
                                 visible: !!eventCard.modelData.location
                                 text: eventCard.modelData.location ?? ""
@@ -448,6 +517,172 @@ FloatingWindow {
     }
 
     Component {
+        id: accountsComponent
+
+        Flickable {
+            contentHeight: accountsLayout.implicitHeight
+            clip: true
+
+            ColumnLayout {
+                id: accountsLayout
+
+                width: parent.width
+                spacing: Tokens.spacing.medium
+
+                StyledText {
+                    text: Tr.tr("Calendar accounts")
+                    font: Tokens.font.title.small
+                }
+
+                StyledText {
+                    Layout.fillWidth: true
+                    text: Tr.tr("Tokens are stored in your system keyring and are never saved in this repository.")
+                    color: Colours.palette.m3onSurfaceVariant
+                    font: Tokens.font.body.small
+                    wrapMode: Text.WordWrap
+                }
+
+                Repeater {
+                    model: CalendarEvents.accounts
+
+                    delegate: StyledRect {
+                        id: accountCard
+
+                        required property var modelData
+
+                        Layout.fillWidth: true
+                        implicitHeight: accountRow.implicitHeight + Tokens.padding.medium * 2
+                        color: Colours.tPalette.m3surfaceContainerHigh
+                        radius: Tokens.rounding.medium
+
+                        RowLayout {
+                            id: accountRow
+
+                            anchors.fill: parent
+                            anchors.margins: Tokens.padding.medium
+                            spacing: Tokens.spacing.medium
+
+                            Rectangle {
+                                width: 10
+                                height: 10
+                                radius: 5
+                                color: accountCard.modelData.provider === "google" ? "#4285f4" : "#00a4ef"
+                            }
+
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 0
+
+                                StyledText {
+                                    Layout.fillWidth: true
+                                    text: accountCard.modelData.label
+                                    font: Tokens.font.body.medium
+                                    elide: Text.ElideRight
+                                }
+
+                                StyledText {
+                                    Layout.fillWidth: true
+                                    text: `${accountCard.modelData.provider} · ${accountCard.modelData.identity}`
+                                    color: Colours.palette.m3onSurfaceVariant
+                                    font: Tokens.font.label.small
+                                    elide: Text.ElideRight
+                                }
+                            }
+
+                            IconButton {
+                                icon: "delete"
+                                type: IconButton.Text
+                                onClicked: CalendarEvents.disconnect(accountCard.modelData.id)
+                            }
+                        }
+                    }
+                }
+
+                StyledText {
+                    Layout.topMargin: Tokens.spacing.small
+                    text: Tr.tr("Google")
+                    font: Tokens.font.title.small
+                }
+
+                StyledText {
+                    Layout.fillWidth: true
+                    text: Tr.tr("Choose the OAuth desktop credentials JSON downloaded from Google Cloud.")
+                    color: Colours.palette.m3onSurfaceVariant
+                    font: Tokens.font.body.small
+                    wrapMode: Text.WordWrap
+                }
+
+                StyledTextField {
+                    Layout.fillWidth: true
+                    placeholderText: Tr.tr("Credentials JSON path")
+                    text: root.googleCredentialsPath
+                    onTextEdited: root.googleCredentialsPath = text
+                }
+
+                StyledTextField {
+                    Layout.fillWidth: true
+                    placeholderText: Tr.tr("Account label (optional)")
+                    text: root.googleAccountLabel
+                    onTextEdited: root.googleAccountLabel = text
+                }
+
+                TextButton {
+                    Layout.alignment: Qt.AlignRight
+                    enabled: !!root.googleCredentialsPath && !CalendarEvents.authorizing
+                    text: CalendarEvents.authorizationProvider === "google" ? Tr.tr("Waiting for browser…") : Tr.tr("Connect Google")
+                    type: TextButton.Filled
+                    onClicked: CalendarEvents.connectGoogle(root.googleCredentialsPath, root.googleAccountLabel)
+                }
+
+                StyledText {
+                    Layout.topMargin: Tokens.spacing.small
+                    text: Tr.tr("Microsoft")
+                    font: Tokens.font.title.small
+                }
+
+                StyledText {
+                    Layout.fillWidth: true
+                    text: Tr.tr("Use an application ID with public client flows enabled. If requested, the login code is copied to the clipboard.")
+                    color: Colours.palette.m3onSurfaceVariant
+                    font: Tokens.font.body.small
+                    wrapMode: Text.WordWrap
+                }
+
+                StyledTextField {
+                    Layout.fillWidth: true
+                    placeholderText: Tr.tr("Microsoft application (client) ID")
+                    text: root.microsoftClientId
+                    onTextEdited: root.microsoftClientId = text
+                }
+
+                StyledTextField {
+                    Layout.fillWidth: true
+                    placeholderText: Tr.tr("Account label (optional)")
+                    text: root.microsoftAccountLabel
+                    onTextEdited: root.microsoftAccountLabel = text
+                }
+
+                TextButton {
+                    Layout.alignment: Qt.AlignRight
+                    enabled: !!root.microsoftClientId && !CalendarEvents.authorizing
+                    text: CalendarEvents.authorizationProvider === "microsoft" ? Tr.tr("Waiting for browser…") : Tr.tr("Connect Microsoft")
+                    type: TextButton.Filled
+                    onClicked: CalendarEvents.connectMicrosoft(root.microsoftClientId, root.microsoftAccountLabel)
+                }
+
+                StyledText {
+                    Layout.fillWidth: true
+                    visible: !!CalendarEvents.lastError
+                    text: CalendarEvents.lastError
+                    color: Colours.palette.m3error
+                    font: Tokens.font.body.small
+                    wrapMode: Text.WordWrap
+                }
+            }
+        }
+    }
+
+    Component {
         id: editorComponent
 
         Flickable {
@@ -463,6 +698,13 @@ FloatingWindow {
                 StyledText {
                     text: root.editingId ? Tr.tr("Edit event") : Tr.tr("New event")
                     font: Tokens.font.title.small
+                }
+
+                TextButton {
+                    enabled: !root.editingId && root.writableCalendars.length > 1
+                    text: Tr.tr("Calendar: %1").arg(root.calendarName(root.draftCalendarId))
+                    type: TextButton.Text
+                    onClicked: root.cycleCalendar()
                 }
 
                 StyledTextField {
