@@ -379,6 +379,8 @@ def google_event(account: dict[str, Any], calendar: dict[str, Any], event: dict[
         "endMs": end_ms,
         "writable": calendar["writable"],
         "htmlLink": event.get("htmlLink", ""),
+        "recurring": bool(event.get("recurringEventId") or event.get("recurrence")),
+        "seriesId": event.get("recurringEventId", ""),
         "syncState": "synced",
     }
 
@@ -438,6 +440,8 @@ def microsoft_event(account: dict[str, Any], calendar: dict[str, Any], event: di
         "endMs": parse_datetime(end_value),
         "writable": calendar["writable"],
         "htmlLink": event.get("webLink", ""),
+        "recurring": bool(event.get("seriesMasterId") or event.get("type") in ("occurrence", "exception", "seriesMaster")),
+        "seriesId": event.get("seriesMasterId", ""),
         "syncState": "synced",
     }
 
@@ -474,7 +478,7 @@ def sync_microsoft(account: dict[str, Any], start: datetime, end: datetime) -> t
                 "startDateTime": start.isoformat().replace("+00:00", "Z"),
                 "endDateTime": end.isoformat().replace("+00:00", "Z"),
                 "$top": 1000,
-                "$select": "id,subject,start,end,isAllDay,location,bodyPreview,webLink,isCancelled",
+                "$select": "id,subject,start,end,isAllDay,location,bodyPreview,webLink,isCancelled,type,seriesMasterId",
             }
         )
         url = f"{GRAPH_API}/me/calendars/{calendar_id}/calendarView?{params}"

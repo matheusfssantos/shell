@@ -9,11 +9,13 @@ Singleton {
 
     property var currentWindow
 
-    function open(date, screen) {
+    function open(date, screen, eventData) {
         if (currentWindow) {
             currentWindow.selectedDate = date;
             currentWindow.displayDate = date;
             currentWindow.visible = true;
+            if (eventData)
+                currentWindow.beginEdit(eventData);
             return;
         }
 
@@ -23,6 +25,11 @@ Singleton {
             selectedDate: date ?? new Date(),
             displayDate: date ?? new Date()
         });
+        if (eventData)
+            Qt.callLater(() => {
+                if (currentWindow)
+                    currentWindow.beginEdit(eventData);
+            });
     }
 
     Component {

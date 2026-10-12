@@ -15,6 +15,7 @@ FloatingWindow {
 
     property date selectedDate: new Date()
     property date displayDate: new Date()
+    property string viewMode: "month"
     property bool editing
     property bool showAccounts
     property string editingId: ""
@@ -37,6 +38,7 @@ FloatingWindow {
     }
     readonly property real availableWidth: Math.max(800, screen.width - 96)
     readonly property real availableHeight: Math.max(560, screen.height - 96)
+    readonly property bool compactHeader: width < 1050
     readonly property var writableCalendars: {
         CalendarEvents.calendars;
         return CalendarEvents.calendars.filter(calendar => calendar.writable);
@@ -74,6 +76,40 @@ FloatingWindow {
         if (event.allDay)
             return Tr.tr("All day");
         return `${Qt.locale().toString(new Date(event.startMs), "HH:mm")}–${Qt.locale().toString(new Date(event.endMs), "HH:mm")}`;
+    }
+
+    function addDays(date, days) {
+        return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
+    }
+
+    function startOfWeek(date) {
+        return addDays(date, -date.getDay());
+    }
+
+    function weekTitle(date) {
+        const start = startOfWeek(date);
+        const end = addDays(start, 6);
+        if (start.getMonth() === end.getMonth())
+            return `${Qt.locale().toString(start, "d")}–${Qt.locale().toString(end, "d MMMM yyyy")}`;
+        return `${Qt.locale().toString(start, "d MMM")} – ${Qt.locale().toString(end, "d MMM yyyy")}`;
+    }
+
+    function setViewMode(mode) {
+        viewMode = mode;
+        displayDate = selectedDate;
+        editing = false;
+        showAccounts = false;
+    }
+
+    function navigateView(direction) {
+        let target;
+        if (viewMode === "month")
+            target = new Date(displayDate.getFullYear(), displayDate.getMonth() + direction, 1);
+        else
+            target = addDays(selectedDate, direction * (viewMode === "week" ? 7 : 1));
+        displayDate = target;
+        selectedDate = target;
+        editing = false;
     }
 
     function calendarName(calendarId) {
@@ -199,7 +235,7 @@ FloatingWindow {
 
         ColumnLayout {
             anchors.fill: parent
-            anchors.margins: Tokens.padding.extraLarge
+            anchors.margins: root.compactHeader ? Tokens.padding.large : Tokens.padding.extraLarge
             spacing: Tokens.spacing.large
 
             RowLayout {
@@ -209,6 +245,29 @@ FloatingWindow {
                 StyledText {
                     text: Tr.tr("Calendar")
                     font: Tokens.font.title.large
+                }
+
+                RowLayout {
+                    visible: !root.compactHeader
+                    spacing: 2
+
+                    TextButton {
+                        text: Tr.tr("Month")
+                        type: root.viewMode === "month" ? TextButton.Filled : TextButton.Text
+                        onClicked: root.setViewMode("month")
+                    }
+
+                    TextButton {
+                        text: Tr.tr("Week")
+                        type: root.viewMode === "week" ? TextButton.Filled : TextButton.Text
+                        onClicked: root.setViewMode("week")
+                    }
+
+                    TextButton {
+                        text: Tr.tr("Day")
+                        type: root.viewMode === "day" ? TextButton.Filled : TextButton.Text
+                        onClicked: root.setViewMode("day")
+                    }
                 }
 
                 Item {
@@ -257,6 +316,38 @@ FloatingWindow {
 
             RowLayout {
                 Layout.fillWidth: true
+                visible: root.compactHeader
+                spacing: 2
+
+                Item {
+                    Layout.fillWidth: true
+                }
+
+                TextButton {
+                    text: Tr.tr("Month")
+                    type: root.viewMode === "month" ? TextButton.Filled : TextButton.Text
+                    onClicked: root.setViewMode("month")
+                }
+
+                TextButton {
+                    text: Tr.tr("Week")
+                    type: root.viewMode === "week" ? TextButton.Filled : TextButton.Text
+                    onClicked: root.setViewMode("week")
+                }
+
+                TextButton {
+                    text: Tr.tr("Day")
+                    type: root.viewMode === "day" ? TextButton.Filled : TextButton.Text
+                    onClicked: root.setViewMode("day")
+                }
+
+                Item {
+                    Layout.fillWidth: true
+                }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
                 Layout.fillHeight: true
                 spacing: Tokens.spacing.large
 
@@ -271,6 +362,7 @@ FloatingWindow {
                         anchors.fill: parent
                         anchors.margins: Tokens.padding.large
                         spacing: Tokens.spacing.medium
+                        visible: root.viewMode === "month"
 
                         RowLayout {
                             Layout.fillWidth: true
@@ -395,6 +487,13 @@ FloatingWindow {
                             }
                         }
                     }
+
+                    Loader {
+                        anchors.fill: parent
+                        anchors.margins: Tokens.padding.large
+                        active: root.viewMode !== "month"
+                        sourceComponent: root.viewMode === "week" ? weekComponent : dayComponent
+                    }
                 }
 
                 StyledRect {
@@ -410,6 +509,195 @@ FloatingWindow {
                         sourceComponent: root.showAccounts ? accountsComponent : (root.editing ? editorComponent : agendaComponent)
                     }
                 }
+            }
+        }
+    }
+
+    Component {
+        id: weekComponent
+
+        ColumnLayout {
+            spacing: root.contentItem.Tokens.spacing.medium
+
+            RowLayout {
+                Layout.fillWidth: true
+
+                IconButton {
+                    icon: "chevron_left"
+                    type: IconButton.Text
+                    onClicked: root.navigateView(-1)
+                }
+
+                StyledText {
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignHCenter
+                    text: root.weekTitle(root.selectedDate)
+                    color: Colours.palette.m3primary
+                    font: root.contentItem.Tokens.font.title.medium
+                }
+
+                IconButton {
+                    icon: "chevron_right"
+                    type: IconButton.Text
+                    onClicked: root.navigateView(1)
+                }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                spacing: root.contentItem.Tokens.spacing.extraSmall
+
+                Repeater {
+                    model: 7
+
+                    delegate: StyledRect {
+                        id: weekDay
+
+                        required property int index
+
+                        readonly property date dayDate: root.addDays(root.startOfWeek(root.selectedDate), index)
+                        readonly property var dayEvents: {
+                            CalendarEvents.events;
+                            return CalendarEvents.eventsForDate(dayDate);
+                        }
+                        readonly property bool selected: CalendarEvents.dateKey(dayDate) === CalendarEvents.dateKey(root.selectedDate)
+                        readonly property bool today: CalendarEvents.dateKey(dayDate) === CalendarEvents.dateKey(new Date())
+
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        color: selected ? Colours.palette.m3primaryContainer : Colours.tPalette.m3surfaceContainerLow
+                        radius: root.contentItem.Tokens.rounding.medium
+
+                        ColumnLayout {
+                            anchors.fill: parent
+                            anchors.margins: root.contentItem.Tokens.padding.small
+                            spacing: root.contentItem.Tokens.spacing.small
+
+                            StyledText {
+                                Layout.fillWidth: true
+                                horizontalAlignment: Text.AlignHCenter
+                                text: Qt.locale().toString(weekDay.dayDate, "ddd\nd")
+                                color: weekDay.selected ? Colours.palette.m3onPrimaryContainer : (weekDay.today ? Colours.palette.m3primary : Colours.palette.m3onSurface)
+                                font: weekDay.today ? root.contentItem.Tokens.font.body.builders.medium.weight(Font.Bold).build() : root.contentItem.Tokens.font.body.medium
+                            }
+
+                            StyledText {
+                                Layout.fillWidth: true
+                                visible: weekDay.dayEvents.length === 0
+                                text: "—"
+                                color: Colours.palette.m3outline
+                                horizontalAlignment: Text.AlignHCenter
+                                font: root.contentItem.Tokens.font.body.small
+                            }
+
+                            ListView {
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+                                spacing: 4
+                                clip: true
+                                model: weekDay.dayEvents
+
+                                delegate: EventCard {
+                                    required property var modelData
+
+                                    width: ListView.view.width
+                                    eventData: modelData
+                                    compact: true
+                                }
+                            }
+                        }
+
+                        TapHandler {
+                            onTapped: {
+                                root.selectedDate = weekDay.dayDate;
+                                root.editing = false;
+                            }
+                            onDoubleTapped: {
+                                root.selectedDate = weekDay.dayDate;
+                                root.beginCreate();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Component {
+        id: dayComponent
+
+        ColumnLayout {
+            spacing: root.contentItem.Tokens.spacing.medium
+
+            RowLayout {
+                Layout.fillWidth: true
+
+                IconButton {
+                    icon: "chevron_left"
+                    type: IconButton.Text
+                    onClicked: root.navigateView(-1)
+                }
+
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 0
+
+                    StyledText {
+                        Layout.fillWidth: true
+                        horizontalAlignment: Text.AlignHCenter
+                        text: root.formatDay(root.selectedDate)
+                        color: Colours.palette.m3primary
+                        font: root.contentItem.Tokens.font.title.medium
+                    }
+
+                    StyledText {
+                        Layout.fillWidth: true
+                        horizontalAlignment: Text.AlignHCenter
+                        text: Tr.tr("%1 events").arg(root.selectedEvents.length)
+                        color: Colours.palette.m3onSurfaceVariant
+                        font: root.contentItem.Tokens.font.label.small
+                    }
+                }
+
+                IconButton {
+                    icon: "chevron_right"
+                    type: IconButton.Text
+                    onClicked: root.navigateView(1)
+                }
+            }
+
+            StyledText {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                visible: root.selectedEvents.length === 0
+                text: Tr.tr("No events for this day")
+                color: Colours.palette.m3onSurfaceVariant
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+                font: root.contentItem.Tokens.font.body.medium
+            }
+
+            ListView {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                spacing: root.contentItem.Tokens.spacing.small
+                clip: true
+                model: root.selectedEvents
+
+                delegate: EventCard {
+                    required property var modelData
+
+                    width: ListView.view.width
+                    eventData: modelData
+                }
+            }
+
+            TextButton {
+                Layout.alignment: Qt.AlignRight
+                text: Tr.tr("Add event")
+                type: TextButton.Filled
+                onClicked: root.beginCreate()
             }
         }
     }
@@ -443,67 +731,11 @@ FloatingWindow {
                 clip: true
                 model: root.selectedEvents
 
-                delegate: StyledRect {
-                    id: eventCard
-
+                delegate: EventCard {
                     required property var modelData
 
                     width: ListView.view.width
-                    implicitHeight: eventLayout.implicitHeight + Tokens.padding.large * 2
-                    color: Colours.tPalette.m3surfaceContainerHigh
-                    radius: Tokens.rounding.medium
-
-                    RowLayout {
-                        id: eventLayout
-
-                        anchors.fill: parent
-                        anchors.margins: Tokens.padding.large
-                        spacing: Tokens.spacing.medium
-
-                        Rectangle {
-                            Layout.fillHeight: true
-                            width: 4
-                            radius: 2
-                            color: eventCard.modelData.colour ?? Colours.palette.m3primary
-                        }
-
-                        ColumnLayout {
-                            Layout.fillWidth: true
-                            spacing: Tokens.spacing.extraSmall
-
-                            StyledText {
-                                Layout.fillWidth: true
-                                text: eventCard.modelData.title
-                                font: Tokens.font.body.large
-                                wrapMode: Text.WordWrap
-                            }
-
-                            StyledText {
-                                text: root.formatEventTime(eventCard.modelData)
-                                color: Colours.palette.m3primary
-                                font: Tokens.font.label.medium
-                            }
-
-                            StyledText {
-                                text: root.calendarName(eventCard.modelData.calendarId)
-                                color: Colours.palette.m3onSurfaceVariant
-                                font: Tokens.font.label.small
-                            }
-
-                            StyledText {
-                                Layout.fillWidth: true
-                                visible: !!eventCard.modelData.location
-                                text: eventCard.modelData.location ?? ""
-                                color: Colours.palette.m3onSurfaceVariant
-                                font: Tokens.font.body.small
-                                elide: Text.ElideRight
-                            }
-                        }
-                    }
-
-                    TapHandler {
-                        onTapped: root.beginEdit(eventCard.modelData)
-                    }
+                    eventData: modelData
                 }
             }
 
@@ -814,6 +1046,99 @@ FloatingWindow {
                     }
                 }
             }
+        }
+    }
+
+    component EventCard: StyledRect {
+        id: card
+
+        required property var eventData
+        property bool compact
+
+        implicitHeight: cardLayout.implicitHeight + root.contentItem.Tokens.padding.medium * 2
+        color: hover.hovered ? Colours.tPalette.m3surfaceContainerHighest : Colours.tPalette.m3surfaceContainerHigh
+        radius: root.contentItem.Tokens.rounding.medium
+
+        RowLayout {
+            id: cardLayout
+
+            anchors.fill: parent
+            anchors.margins: root.contentItem.Tokens.padding.medium
+            spacing: root.contentItem.Tokens.spacing.small
+
+            Rectangle {
+                Layout.fillHeight: true
+                width: 4
+                radius: 2
+                color: card.eventData.colour ?? Colours.palette.m3primary
+            }
+
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: 1
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: root.contentItem.Tokens.spacing.extraSmall
+
+                    StyledText {
+                        Layout.fillWidth: true
+                        text: card.eventData.title
+                        font: card.compact ? root.contentItem.Tokens.font.body.medium : root.contentItem.Tokens.font.body.large
+                        wrapMode: Text.WordWrap
+                        maximumLineCount: card.compact ? 2 : 3
+                        elide: Text.ElideRight
+                    }
+
+                    MaterialIcon {
+                        visible: card.eventData.recurring ?? false
+                        text: "repeat"
+                        color: Colours.palette.m3onSurfaceVariant
+                        fontStyle: root.contentItem.Tokens.font.icon.small
+                    }
+
+                    StyledText {
+                        visible: (card.eventData.sourceCount ?? 1) > 1
+                        text: `×${card.eventData.sourceCount}`
+                        color: Colours.palette.m3tertiary
+                        font: root.contentItem.Tokens.font.label.small
+                    }
+                }
+
+                StyledText {
+                    text: root.formatEventTime(card.eventData)
+                    color: Colours.palette.m3primary
+                    font: root.contentItem.Tokens.font.label.medium
+                }
+
+                StyledText {
+                    Layout.fillWidth: true
+                    visible: !card.compact
+                    text: {
+                        const location = card.eventData.location ? ` · ${card.eventData.location}` : "";
+                        return `${root.calendarName(card.eventData.calendarId)}${location}`;
+                    }
+                    color: Colours.palette.m3onSurfaceVariant
+                    font: root.contentItem.Tokens.font.label.small
+                    elide: Text.ElideRight
+                }
+            }
+
+            IconButton {
+                visible: card.eventData.writable !== false && (!card.compact || hover.hovered)
+                icon: "delete"
+                type: IconButton.Text
+                padding: card.compact ? root.contentItem.Tokens.padding.extraSmall : root.contentItem.Tokens.padding.small
+                onClicked: CalendarEvents.removeEvent(card.eventData.id)
+            }
+        }
+
+        HoverHandler {
+            id: hover
+        }
+
+        TapHandler {
+            onTapped: root.beginEdit(card.eventData)
         }
     }
 }

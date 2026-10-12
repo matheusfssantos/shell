@@ -30,7 +30,8 @@ Singleton {
             primary: true
         })
     readonly property var calendars: [localCalendar, ...remoteCalendars]
-    readonly property var events: [...localEvents, ...remoteEvents]
+    readonly property var rawEvents: [...localEvents, ...remoteEvents]
+    readonly property var events: deduplicateEvents(rawEvents)
     readonly property string bridgePath: `${Quickshell.shellDir}/scripts/calendar-sync.py`
 
     signal syncCompleted(bool success)
@@ -53,8 +54,40 @@ Singleton {
         return events.filter(event => event.startMs < to && event.endMs > from).sort((a, b) => a.startMs - b.startMs);
     }
 
+    function eventFingerprint(event) {
+        const title = (event.title ?? "").trim().toLocaleLowerCase();
+        const location = (event.location ?? "").trim().toLocaleLowerCase();
+        return `${title}\u001f${event.startMs}\u001f${event.endMs}\u001f${event.allDay ? 1 : 0}\u001f${location}`;
+    }
+
+    function deduplicateEvents(sourceEvents) {
+        const groups = new Map();
+        for (const event of sourceEvents) {
+            const fingerprint = eventFingerprint(event);
+            const group = groups.get(fingerprint) ?? [];
+            group.push(event);
+            groups.set(fingerprint, group);
+        }
+
+        return [...groups.values()].map(group => {
+            const preferred = group.find(event => event.writable) ?? group[0];
+            return Object.assign({}, preferred, {
+                duplicateEvents: group,
+                sourceCount: group.length,
+                calendarIds: [...new Set(group.map(event => event.calendarId))],
+                colours: [...new Set(group.map(event => event.colour))]
+            });
+        });
+    }
+
+    function rawEventsForDate(date) {
+        const from = startOfDay(date).getTime();
+        const to = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1).getTime();
+        return rawEvents.filter(event => event.startMs < to && event.endMs > from).sort((a, b) => a.startMs - b.startMs);
+    }
+
     function eventById(id) {
-        return events.find(event => event.id === id) ?? null;
+        return rawEvents.find(event => event.id === id) ?? null;
     }
 
     function calendarById(id) {
@@ -115,7 +148,12 @@ Singleton {
         if (!existing)
             return;
         if (existing.provider !== "local") {
-            mutateRemote("delete", existing);
+            const previousEvents = root.remoteEvents;
+            root.remoteEvents = root.remoteEvents.filter(event => event.id !== id);
+            mutateRemote("delete", existing, result => {
+                if (!result.success)
+                    root.remoteEvents = previousEvents;
+            });
             return;
         }
         root.localEvents = root.localEvents.filter(event => event.id !== id);
@@ -164,13 +202,14 @@ Singleton {
         });
     }
 
-    function mutateRemote(action, payload) {
+    function mutateRemote(action, payload, completed) {
         lastError = "";
         runBridge([action, encodePayload(payload)], result => {
             if (result.success)
                 root.sync();
             else
                 root.lastError = result.error;
+            completed?.(result);
         });
     }
 
