@@ -37,7 +37,7 @@ CACHE_FILE = STATE_DIR / "calendar-remote-events.json"
 GOOGLE_AUTH = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN = "https://oauth2.googleapis.com/token"
 GOOGLE_API = "https://www.googleapis.com/calendar/v3"
-MICROSOFT_LOGIN = "https://login.microsoftonline.com/common/oauth2/v2.0"
+MICROSOFT_LOGIN = "https://login.microsoftonline.com/{authority}/oauth2/v2.0"
 GRAPH_API = "https://graph.microsoft.com/v1.0"
 GOOGLE_SCOPE = "openid email profile https://www.googleapis.com/auth/calendar"
 MICROSOFT_SCOPE = "offline_access openid profile User.Read Calendars.ReadWrite"
@@ -186,7 +186,7 @@ def refresh_microsoft(account: dict[str, Any], credentials: dict[str, Any]) -> d
     if credentials.get("expires_at", 0) > time.time() + 90:
         return credentials
     response = request_json(
-        f"{MICROSOFT_LOGIN}/token",
+        f"{MICROSOFT_LOGIN.format(authority=credentials.get('authority', 'common'))}/token",
         method="POST",
         form={
             "client_id": account["client_id"],
@@ -304,11 +304,22 @@ def connect_google(credentials_path: str, label: str) -> dict[str, Any]:
 
 
 def connect_microsoft(client_id: str, label: str) -> dict[str, Any]:
-    device = request_json(
-        f"{MICROSOFT_LOGIN}/devicecode",
-        method="POST",
-        form={"client_id": client_id, "scope": MICROSOFT_SCOPE},
-    )
+    authority = "common"
+    try:
+        device = request_json(
+            f"{MICROSOFT_LOGIN.format(authority=authority)}/devicecode",
+            method="POST",
+            form={"client_id": client_id, "scope": MICROSOFT_SCOPE},
+        )
+    except CalendarError as error:
+        if "AADSTS9002346" not in str(error):
+            raise
+        authority = "consumers"
+        device = request_json(
+            f"{MICROSOFT_LOGIN.format(authority=authority)}/devicecode",
+            method="POST",
+            form={"client_id": client_id, "scope": MICROSOFT_SCOPE},
+        )
     print(device.get("message", "Abra o navegador para autorizar a conta Microsoft."), file=sys.stderr, flush=True)
     verification_url = device.get("verification_uri_complete")
     if not verification_url:
@@ -322,7 +333,7 @@ def connect_microsoft(client_id: str, label: str) -> dict[str, Any]:
         time.sleep(interval)
         try:
             token = request_json(
-                f"{MICROSOFT_LOGIN}/token",
+                f"{MICROSOFT_LOGIN.format(authority=authority)}/token",
                 method="POST",
                 form={
                     "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
@@ -333,7 +344,7 @@ def connect_microsoft(client_id: str, label: str) -> dict[str, Any]:
             break
         except CalendarError as error:
             message = str(error)
-            if "authorization_pending" in message:
+            if "authorization_pending" in message or "AADSTS70016" in message:
                 continue
             if "slow_down" in message:
                 interval += 5
@@ -342,6 +353,7 @@ def connect_microsoft(client_id: str, label: str) -> dict[str, Any]:
     if not token:
         raise CalendarError("Microsoft authorization timed out")
     token["expires_at"] = time.time() + int(token.get("expires_in", 3600))
+    token["authority"] = authority
     profile = request_json(f"{GRAPH_API}/me?$select=displayName,mail,userPrincipalName", headers=bearer(token["access_token"]))
     identity = profile.get("mail") or profile.get("userPrincipalName") or profile.get("id") or "Microsoft"
     return add_account("microsoft", client_id, label or profile.get("displayName", ""), identity, token)
