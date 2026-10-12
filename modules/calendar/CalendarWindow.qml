@@ -1056,7 +1056,7 @@ FloatingWindow {
         property bool compact
 
         implicitHeight: cardLayout.implicitHeight + root.contentItem.Tokens.padding.medium * 2
-        color: hover.hovered ? Colours.tPalette.m3surfaceContainerHighest : Colours.tPalette.m3surfaceContainerHigh
+        color: Colours.tPalette.m3surfaceContainerHigh
         radius: root.contentItem.Tokens.rounding.medium
 
         RowLayout {
@@ -1122,23 +1122,32 @@ FloatingWindow {
                     font: root.contentItem.Tokens.font.label.small
                     elide: Text.ElideRight
                 }
+
+                StyledText {
+                    Layout.fillWidth: true
+                    visible: !card.compact
+                    text: CalendarEvents.accountIdentitiesForEvent(card.eventData)
+                    color: Colours.palette.m3outline
+                    font: root.contentItem.Tokens.font.label.small
+                    elide: Text.ElideRight
+                }
             }
 
             IconButton {
-                visible: card.eventData.writable !== false && (!card.compact || hover.hovered)
+                visible: !card.compact && card.eventData.writable !== false
+                icon: "edit"
+                type: IconButton.Text
+                padding: root.contentItem.Tokens.padding.small
+                onClicked: root.beginEdit(card.eventData)
+            }
+
+            IconButton {
+                visible: card.eventData.writable !== false
                 icon: "delete"
                 type: IconButton.Text
                 padding: card.compact ? root.contentItem.Tokens.padding.extraSmall : root.contentItem.Tokens.padding.small
                 onClicked: CalendarEvents.removeEvent(card.eventData.id)
             }
-        }
-
-        HoverHandler {
-            id: hover
-        }
-
-        TapHandler {
-            onTapped: root.beginEdit(card.eventData)
         }
     }
 }

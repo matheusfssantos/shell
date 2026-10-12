@@ -94,6 +94,17 @@ Singleton {
         return calendars.find(calendar => calendar.id === id) ?? localCalendar;
     }
 
+    function accountIdentitiesForEvent(event) {
+        const sources = event.duplicateEvents ?? [event];
+        const identities = sources.map(source => {
+            if (source.provider === "local")
+                return "Local";
+            const account = accounts.find(item => item.id === source.accountId);
+            return account?.identity ?? account?.label ?? "";
+        }).filter(identity => identity);
+        return [...new Set(identities)].join(" · ");
+    }
+
     function defaultWritableCalendar() {
         return remoteCalendars.find(calendar => calendar.primary && calendar.writable) ?? remoteCalendars.find(calendar => calendar.writable) ?? localCalendar;
     }

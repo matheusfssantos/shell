@@ -524,6 +524,7 @@ CustomMouseArea {
                     width: ListView.view.width
                     eventData: modelData
                     showDelete: true
+                    showAccount: true
                 }
             }
         }
@@ -566,6 +567,8 @@ CustomMouseArea {
 
                     Layout.fillWidth: true
                     eventData: modelData
+                    interactive: false
+                    showAccount: true
                 }
             }
 
@@ -583,9 +586,11 @@ CustomMouseArea {
 
         required property var eventData
         property bool showDelete
+        property bool showAccount
+        property bool interactive: true
 
         implicitHeight: eventRow.implicitHeight + Tokens.padding.extraSmall * 2
-        color: eventHover.hovered ? Colours.tPalette.m3surfaceContainerHigh : Colours.tPalette.m3surfaceContainer
+        color: Colours.tPalette.m3surfaceContainer
         radius: Tokens.rounding.small
 
         RowLayout {
@@ -624,6 +629,15 @@ CustomMouseArea {
                     font: Tokens.font.label.small
                     elide: Text.ElideRight
                 }
+
+                StyledText {
+                    Layout.fillWidth: true
+                    visible: eventCard.showAccount
+                    text: CalendarEvents.accountIdentitiesForEvent(eventCard.eventData)
+                    color: Colours.palette.m3outline
+                    font: Tokens.font.label.small
+                    elide: Text.ElideRight
+                }
             }
 
             MaterialIcon {
@@ -642,11 +656,8 @@ CustomMouseArea {
             }
         }
 
-        HoverHandler {
-            id: eventHover
-        }
-
         TapHandler {
+            enabled: eventCard.interactive
             onTapped: CalendarWindowFactory.open(new Date(eventCard.eventData.startMs), ShellState.forActive()?.modelData, eventCard.eventData)
         }
     }
