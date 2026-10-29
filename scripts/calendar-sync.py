@@ -185,19 +185,32 @@ def refresh_google(account: dict[str, Any], credentials: dict[str, Any]) -> dict
 def refresh_microsoft(account: dict[str, Any], credentials: dict[str, Any]) -> dict[str, Any]:
     if credentials.get("expires_at", 0) > time.time() + 90:
         return credentials
-    response = request_json(
-        f"{MICROSOFT_LOGIN.format(authority=credentials.get('authority', 'common'))}/token",
-        method="POST",
-        form={
-            "client_id": account["client_id"],
-            "refresh_token": credentials["refresh_token"],
-            "grant_type": "refresh_token",
-            "scope": MICROSOFT_SCOPE,
-        },
-    )
+    authority = credentials.get("authority", "common")
+    form = {
+        "client_id": account["client_id"],
+        "refresh_token": credentials["refresh_token"],
+        "grant_type": "refresh_token",
+        "scope": MICROSOFT_SCOPE,
+    }
+    try:
+        response = request_json(
+            f"{MICROSOFT_LOGIN.format(authority=authority)}/token",
+            method="POST",
+            form=form,
+        )
+    except CalendarError as error:
+        if authority == "consumers" or not any(code in str(error) for code in ("AADSTS9002331", "AADSTS9002346")):
+            raise
+        authority = "consumers"
+        response = request_json(
+            f"{MICROSOFT_LOGIN.format(authority=authority)}/token",
+            method="POST",
+            form=form,
+        )
     if "refresh_token" not in response:
         response["refresh_token"] = credentials["refresh_token"]
     response["expires_at"] = time.time() + int(response.get("expires_in", 3600))
+    response["authority"] = authority
     secret_store(account["id"], response, account["label"])
     return response
 
