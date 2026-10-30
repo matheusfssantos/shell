@@ -211,15 +211,18 @@ CustomMouseArea {
                 screenState.launcher = false;
         }
 
-        // Show dashboard on hover
-        const showDashboard = Config.dashboard.showOnHover && inTopPanel(panels.dashboard, x, y);
+        // Show dashboard on hover when enabled. In click/drag mode, pointer
+        // movement must not override the explicitly selected state.
+        if (Config.dashboard.showOnHover) {
+            const showDashboard = inTopPanel(panels.dashboard, x, y);
 
-        // Always update visibility based on hover if not in shortcut mode
-        if (!dashboardShortcutActive) {
-            screenState.dashboard = showDashboard;
-        } else if (showDashboard) {
-            // If hovering over dashboard area while in shortcut mode, transition to hover control
-            dashboardShortcutActive = false;
+            // Always update visibility based on hover if not in shortcut mode
+            if (!dashboardShortcutActive) {
+                screenState.dashboard = showDashboard;
+            } else if (showDashboard) {
+                // If hovering over dashboard area while in shortcut mode, transition to hover control
+                dashboardShortcutActive = false;
+            }
         }
 
         // Show/hide dashboard on drag (for touchscreen devices)
@@ -278,7 +281,7 @@ CustomMouseArea {
             if (root.screenState.dashboard) {
                 // Dashboard became visible, immediately check if this should be shortcut mode
                 const inDashboardArea = root.inTopPanel(root.panels.dashboard, root.mouseX, root.mouseY);
-                if (!inDashboardArea) {
+                if (!Config.dashboard.showOnHover || !inDashboardArea) {
                     root.dashboardShortcutActive = true;
                 }
             } else {

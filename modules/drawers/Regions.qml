@@ -27,6 +27,14 @@ Region {
         height: panel.height * (1 - root.panels.dashboard.offsetScale) + root.borderThickness
     }
 
+    Region {
+        x: root.bar.implicitWidth + (root.win.width - root.bar.implicitWidth - root.clampedThickness - width) / 2
+        y: 0
+        width: root.win.dashboardHandleWidth
+        height: root.win.dashboardHandleHeight
+        intersection: Intersection.Subtract
+    }
+
     R {
         panel: root.panels.launcher
         y: root.win.height - height

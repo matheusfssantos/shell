@@ -41,6 +41,8 @@ StyledWindow {
     readonly property real borderRounding: contentItem.Config.border.rounding * (1 - fsTransitionProg)
     readonly property real shadowOpacity: 0.7 * (1 - fsTransitionProg)
     readonly property real borderLayoutThickness: hasFullscreen ? 0 : contentItem.Config.border.thickness
+    readonly property int dashboardHandleWidth: 48
+    readonly property int dashboardHandleHeight: 16
 
     property color surfaceColour: Colours.tPalette.m3surface
 
@@ -307,6 +309,18 @@ StyledWindow {
             popouts: panels.popouts
 
             fullscreen: root.hasFullscreen
+        }
+
+        DashboardHandle {
+            z: 100
+            x: bar.implicitWidth + (parent.width - bar.implicitWidth - root.borderThickness - width) / 2
+            anchors.top: parent.top
+
+            width: root.dashboardHandleWidth
+            height: root.dashboardHandleHeight
+            visible: !root.hasFullscreen && Config.dashboard.enabled
+
+            screenState: root.screenState
         }
     }
 
